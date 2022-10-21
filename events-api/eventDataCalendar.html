@@ -1,0 +1,426 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+	<title>UMN Events API - Event Dates &amp; Sessions On Calendar</title>
+	<meta charset="utf-8"/>
+	<!-- stylesheet for http://fullcalendar.io/ -->
+	<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/fullcalendar/2.4.0/fullcalendar.min.css"/>
+	<style>
+	/* start css resets */
+	html, body, div, span, object, h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+	a, abbr, big, cite, code, img, small, form, label, legend, table,
+	caption, tr, th, td, article, aside, details, figure,
+	figcaption, output, section, summary, time, mark {
+	margin:0;
+	padding:0;
+	border:0;
+	font:inherit;
+	font-size:100%;
+	vertical-align:baseline;
+	}
+	html {line-height:1;}
+	table {border-collapse:collapse;border-spacing:0;}
+	caption, th, td {text-align:left;font-weight:normal;vertical-align:middle;}
+	/* end css resets */
+	body {
+	font-family:Verdana, "Geneva", sans-serif;
+	line-height:1em;
+	max-width:90em;
+	margin:0 auto;
+	background-color:#fff;
+	box-sizing:content-box;
+	color:#000;
+	}
+	a:link, a:visited {
+	font-family:Verdana, "Geneva", sans-serif;
+	color:#000000;
+	}
+	a:hover, a:visited:hover {
+	font-family:Verdana, "Geneva", sans-serif;
+	color:#0000ff;
+	}
+	#eventSessionsTable table {width:100%;max-width:90em;}
+	#eventSessionsTable th {padding-bottom:4px;padding-top:4px;padding-right:4px;border-bottom:1px solid #000;font-weight:bold;font-size:.9em;}
+	#eventSessionsTable td {padding-top:4px;padding-right:4px;font-size:.9em;}
+
+	/* calendar css tweaks - needs to be defined after the fullcalender css is included */
+	.fc-unthemed .fc-today {background:#cccccc;}
+	.fc-event {font-size:.75em;cursor:pointer;}
+	.fc-left {font-size:1em;font-weight:bold;padding-top:14px;}
+	</style>
+
+
+	<!-- THESE 4 JAVASCRIPT LIBARIES ARE NEEDED -->
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+	<script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"></script>
+	<!-- moment.js is not hosted on a public CDN so you will need to host it on your web server -->
+	<script src="moment.js"></script>
+	<script src="//cdnjs.cloudflare.com/ajax/libs/fullcalendar/2.4.0/fullcalendar.min.js"></script>
+
+	<script type="text/javascript">
+	// the hostPrefix will need to be updated when you're ready to go live against Production data
+	var hostPrefix = "https://don-umn.cs4.force.com";
+
+	var registrationInstructionsText, registrationThankYouText, allEvents;
+	var uri = window.location.pathname;
+
+	$(document).ready(function() {
+		var campusCode = "UMNTC"; // Possible values: UMNTC, UMNCR-Onsite, UMNCR-Online, UMNDL, UMNMO, UMNRO
+
+		// next 2 variables can have multiple values separated by commas
+		var eventTypes = "Visit"; // Possible values: Visit, Non-UMN Event, UMN On Campus Event, UMN Off Campus Event (or any value on the umn_event__Event__c.umn_event__Event_Type__c field)
+		var eventSubType = "Freshman,Transfer"; // Possible values: Freshman, Transfer, Group (or any value on the umn_event__Event__c.umn_event__Event_Sub_Type__c field)
+
+		// look for parameters on the url - valid ones are: eventDateId and eventId
+		var eventDateId = getParameterByName("eventDateId");
+		var eventId = getParameterByName("eventId");
+
+		// set the href correctly for "Pick Another Date" urls
+		if (eventDateId != "") {
+			$("#eventDetailsPickDateLink").attr("href", uri);
+			$("#eventRegistrationPickDateLink").attr("href", uri);
+		} else {
+			$("#eventDetailsPickDateLink").attr("href", "javascript:showCalendar();");
+			$("#eventRegistrationPickDateLink").attr("href", "javascript:showCalendar();");
+		}
+
+		// query the events for the calendar
+		$.ajax({
+			url: hostPrefix + "/jsonGetEventCalendarData",
+			dataType: "json",
+			data: {
+				campusCode: campusCode, // required
+				eventTypes: eventTypes, // required
+				eventSubTypes: eventSubType, // optional
+				eventDateId: eventDateId, // optional
+				eventId: eventId // optional
+			},
+			success: function(result) {
+				$("#formOutput").html("Event Date API Call Results: <pre>" + JSON.stringify(result, null, "  ") + "</pre>").show(); // useful for debugging response from SF method
+				if ( result.hasOwnProperty('error') ) { // look for error message - these types of errors are fatal
+					$("#calendarSection").hide(); // hide the calendar
+					$("#errorMessage").html(result.error); // reset the error msg
+					$("#errorSection").show();
+				} else { // no fatal error - process data
+					// first look for a "soft" error i.e. none active, full capacity, etc
+					if (result.notFoundErrorMessage != null) {
+						$("#calendarSection").hide(); // hide the calendar
+						$("#errorMessage").html(result.notFoundErrorMessage); // reset the error msg
+						if (result.notFoundShowParentEventUrl) { // value is true or false
+							if (result.notFoundParentEventId != null) { // there are 2 possible links
+								$("#errorLink").html("View All Available Dates for " + result.notFoundParentEventName);
+								$("#errorLink").attr("href", uri + "?eventId=" + result.notFoundParentEventId);
+							} else {
+								$("#errorLink").html("View All Visit's for Twin Cities");
+								$("#errorLink").attr("href", uri);
+							}
+							$("#errorLink").show();
+						}
+						$("#errorSection").show();
+					} else { // no error - build the category filter & the calendar
+
+						// populate the filter picklist if there are 2 or more Event Categories
+						if (result.eventCategories.length > 1) {
+							// build entries in the Event Category picklist field
+							$.each(result.eventCategories, function(rowIndex, ecVal) {
+								$("#EventCategory").append($("<option/>").attr("value", ecVal).text(ecVal));
+							});
+							$("#filter").show(); // show the filter div that contains the picklist
+						}
+
+						// put the events in a local var so we can filter if needed
+						allEvents = result.calendarEvents;
+
+						// see http://fullcalendar.io/ for details on the calendar code
+						$("#calendar").fullCalendar({
+							// options here
+							header: {
+								left: "title",
+								center: "",
+								right: "prev,next"
+							},
+							aspectRatio: 3,
+							fixedWeekCount: false, // true = always 6 rows, false = 4, 5 or 6 rows depending on month
+							defaultView: "month",
+							editable: false,
+							eventLimit: true, // allow "more" link when too many events
+							// data here
+							events: allEvents, // initially assign all events - may get filtered later
+							// handle clicking on an event here
+							eventClick: function(event) {
+								showEventDetails(event);
+							}
+						})
+
+						// goes to the month with the first available Event
+						if (result.firstCalendarEvent != null && result.firstCalendarEvent != "") {
+							$("#calendar").fullCalendar("gotoDate", result.firstCalendarEvent);
+						}
+
+						// now see if we need to show the Event Details instead of the calendar
+						// found 1 entry on calendar and user requested a specific Date - show Event Details instead of the calendar
+						if (result.calendarEvents.length == 1 && result.requestedEventDateCalendarEventId != null && result.requestedEventDateCalendarEventId != "") {
+							showEventDetails(allEvents[0]);
+						} // end of calendar setup
+					}
+				}
+			},
+			error: function() {
+				//$("#formOutput").append("<br/>error results = " + JSON.stringify(result)).show(); // useful for debugging response from SF method
+				// this is for network issues, or fatal errors
+				// display error message and do not show the register button
+				$("#calendarSection").hide(); // hide the calendar
+				$("#errorMessage").html("Error: Network Issues, please try again later.");
+				$("#errorSection").show();
+			}
+		});
+	});
+
+
+	function filterEventsOnCalendar() {
+		$("#calendar").fullCalendar("removeEvents"); // clear all events from the calendar
+		// figure out which events to rerender on the calendar
+		if ($("#EventCategory").val() == "View All") {
+			$("#calendar").fullCalendar("addEventSource", allEvents); // add back all events
+		} else {
+			var filteredEvents = [];
+			$(allEvents).each(function (index, value) {
+				if ($("#EventCategory").val() == value.eventCategory) {
+					filteredEvents.push(value);
+				}
+			});
+			$("#calendar").fullCalendar("addEventSource", filteredEvents); // add back filtered events
+		}
+	}
+
+
+	// called from calendar when a user clicks on an Event
+	function showEventDetails(evt) { // evt = event obj
+		// set the registration instructions - the registration section isn't in this example
+		registrationInstructionsText = evt.registrationInstructions;
+		registrationThankYouText = evt.registrationThankYouMessage;
+
+		$("#calendarSection").toggle("slide", {direction:"right"}); // hide the calendar
+		// set event data dynamically in the eventDetails div below - will render it at the end
+		$("#eventTitle").html(evt.title);
+		$("#eventDate").html(evt.formattedEventDate);
+		if (evt.formattedEventTime != null) {
+			$("#eventTime").html("Time:&nbsp;" + evt.formattedEventTime);
+		} else {
+			$("#eventTime").hide();
+		}
+		if (evt.eventLocation != null) {
+			if (evt.eventLocationMapUrl != null) { // hyperlink the address
+				var locationLink = $("<a/>", {href:evt.eventLocationMapUrl, target:"_blank", style:"color:#000;font-size:.95em;", tabindex:"-1"});
+				locationLink.html(evt.eventLocation);
+				$("#eventLocationValue").html(locationLink);
+			} else {
+				$("#eventLocationValue").html(evt.eventLocation);
+			}
+		} else {
+			$("#eventLocation").hide();
+		}
+		// have to unescape the web description so it will show html
+		$("#eventDescription").html(evt.webDescription);
+
+		// make asynchronous call to SF to get Event Sessions for the selected Event
+		$.ajax({
+			url: hostPrefix + "/jsonGetEventSessionsForEventDate",
+			dataType: "json",
+			data: {
+				eventDateId: evt.id
+			},
+			success: function(result) {
+				$("#formOutput").html("Event Session API Call Results: <pre>" + JSON.stringify(result, null, "  ") + "</pre>").show(); // useful for debugging response from SF method
+				/* 4 scenarios here
+				1. API returned an error string
+				2. Has Sessions and a required one does not have capacity. Bad - show error message and do not show the Register button
+				3. Has Sessions and all required ones have capacity. All good - show the Register button
+				4. No Sessions for Event or Visit. All good - show the Register button
+				*/
+				var hasError = false;
+				if ( result.hasOwnProperty('error') ) { // look for error message
+					$("#errorMessage").html(result.error); // reset the error msg
+					hasError = true;
+				} else { // no error - process data
+					var eventSessionsArray = $.makeArray( result );
+					if (eventSessionsArray.length > 0) {
+						$("#errorMessage").html(""); // reset the error msg
+						$.each(eventSessionsArray, function(index, sessy) {
+							// check if there is a capacity issue for required sessions
+							if (sessy.eSession.umn_event__Required_Session__c && sessy.eSession.umn_event__Calculated_Capacity_At_Limit__c) {
+								// build error message(s)
+								$("#errorMessage").append("Error: The " + sessy.eSession.Name + " required session is at capacity. Please pick another Event Date.<br/>");
+								hasError = true;
+							}
+						});
+					}
+				}
+
+				if (hasError) { // error
+					// display error message
+					$("#errorSection").show(); // this section has "Pick Another Date" links
+				} else {
+					if (eventSessionsArray.length > 0) {
+						// build Event Sessions table if some exists
+						// write the header column
+						var table = $("<table/>");
+						var headRow = $("<tr/>");
+						headRow.append($("<th/>").text("Select"));
+						headRow.append($("<th/>").text("Session"));
+						headRow.append($("<th/>").text("Start Time"));
+						headRow.append($("<th/>").text("End Time"));
+						headRow.append($("<th/>").text("Location"));
+						table.append(headRow);
+
+						$.each(eventSessionsArray, function(rowIndex, sessy) {
+							var requiredText = "";
+							var ti = "";
+							var smartId = "";
+							if (sessy.eSession.umn_event__Required_Session__c) {
+								requiredText = "required";
+								ti = "-1";
+							}
+							// building an id value that we can parse and use for validation - make sure this is unique
+							smartId += requiredText + "_" + sessy.eSession.umn_event__Session_Start_Time__c + "_" + sessy.eSession.Id;
+
+							var dataRow = $("<tr/>");
+							// build the checkbox field
+							dataRow.append($("<td/>").append(
+								$("<input/>", {
+									type:"checkbox",
+									id:smartId,
+									name:"selectedEventSessions[]",
+									tabindex:ti,
+									value:sessy.eSession.Id,
+									checked:sessy.eSession.umn_event__Required_Session__c
+								})).append($("<label/>", {style:"font-size:.7em", text:requiredText})));
+							dataRow.append($("<td/>").text(sessy.eSession.Name));
+							dataRow.append($("<td/>").text(sessy.eSession.umn_event__Session_Start_Time__c));
+							dataRow.append($("<td/>").text(sessy.eSession.umn_event__Session_End_Time__c));
+							dataRow.append($("<td/>").text(sessy.eSession.umn_event__Session_Location_Formula__c));
+							table.append(dataRow);
+						});
+						$("#eventSessionsTable").html(table);
+						$("#eventSessions").show(); // show the section on the page
+					}
+					$("#eventDetailsButtonGroup").show(); // show the buttons
+
+					// build select & register button
+					$("#selectButton").unbind().click(function() {
+						$("#umn_event__Event_Date__c").val(evt.id); // set the selected Event Date Id in a hidden form field
+						$("#eventDetailsButtonGroup").hide(); // hid the buttons
+						$("#registrationInstructions").html(registrationInstructionsText);
+						$("#registrationInstructions").show();
+						$("#registrationThankYouMessage").html(registrationThankYouText);
+						$("#registrationThankYouMessage").show();
+						$("#eventRegistration").toggle("slide", {direction:"down"}); // show event details
+					});
+				}
+			},
+			error: function() {
+				// this is for network issues, or fatal errors
+				// display error message and do not show the register button
+				$("#errorMessage").html("Error: Network Issues, please try again later.");
+				$("#errorSection").show();
+			}
+		});
+		$("#eventDetails").toggle("slide", {direction:"left"}); // toggle event details
+	}
+
+
+	// hides event details and takes user back to calendar
+	function showCalendar() {
+		$("#eventDetails").toggle("slide", {direction:"right"}); // hide event details
+		$("#calendarSection").toggle("slide", {direction:"left"}); // show the calendar
+		$("#eventDetailsButtonGroup").hide(); // hide the select & register button
+		$("#errorLink").hide(); // hide the error link in the error section
+		$("#errorSection").hide(); // hide the error section
+		$("#eventSessions").hide(); // hide the event sessions
+	}
+
+
+	function getParameterByName(name) {
+		name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+		var regex = new RegExp("[\\?&]" + name + "=([^&#]*)");
+			results = regex.exec(location.search);
+		return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+	}
+	</script>
+</head>
+
+<body>
+	<div style="padding-top:40px;padding-left:10px;padding-right:10px;color:#000;font-weight:bold;font-size:1.5em;">UMN Events API - Event Dates &amp; Sessions On Calendar</div><br/>
+
+	<div style="padding-top:20px;padding-left:10px;padding-right:10px;color:#000;font-size:1em;">
+		This example calls the <strong>jsonGetEventCalendarData</strong> and <strong>jsonGetEventSessionsForEventDate</strong> Event API methods.
+		This sample implementation uses the <a href="http://fullcalendar.io/" target="_blank">Full Calendar open source Jquery plugin</a>. The
+		first API call to get Event Calendar Data queries up to 150 days in the future for a given Campus Code and returns Event Dates that are
+		visible on the web and have capacity. If the returned data has two or more unique Event Category values (excluding blanks), the javascript
+		will build and display an Event Category filter that updates the calendar without making more calls to the API server. This implementation
+		uses JqueryUI to hide the calendar and show Event Details once a calendar entry is clicked. This implementation also supports going
+		directly to an Event Date record with a valid eventDateId parameter or showing only Dates for a specific Event with a valid eventId.
+		You can request an Event Id and Event Date Id from the UMN Salesforce team to test these parameters.
+	</div><br/><br/>
+
+
+	<!-- event details - display is controlled by javascript - not controller -->
+	<div id="eventDetails" style="padding-left:10px;padding-right:10px;color:#000;font-size:1em;display:none;">
+		<div style="margin-bottom:4px;font-weight:bold;font-size:1.2em" id="eventTitle"></div>
+		<div style="margin-bottom:4px;">Date:&nbsp;<span id="eventDate"></span></div>
+		<div style="margin-bottom:4px;" id="eventTime"></div>
+		<div style="margin-bottom:4px;" id="eventLocation">
+			<table cellpadding="0" cellspacing="0"><tr>
+				<td style="vertical-align:top;"><div>Location:&nbsp;</div></td>
+				<td><div id="eventLocationValue"></div></td>
+			</tr></table>
+		</div><br/>
+		<p id="eventDescription"></p><br/>
+	</div>
+
+
+	<!-- error section -->
+	<div id="errorSection" style="padding-top:40px;padding-left:10px;padding-right:10px;display:none;">
+		<div id="errorMessage" style="color:#cc0000;font-weight:bold;font-size:1em;"></div><br/>
+	</div>
+
+
+	<!-- event sessions -->
+	<div id="eventSessions" style="padding-left:10px;padding-right:10px;font-size:1em;display:none;">
+		<div style="padding-top:10px;font-size:1.1em;font-weight:bold;">Select Sessions</div><br/>
+		All required sessions have been selected for you. Check the box next to any optional sessions you would like to attend.<br/><br/>
+		<label for="selectedEventSessions[]" class="error" style="margin-left:0px;"></label>
+		<div id="eventSessionsTable"></div><br/>
+	</div>
+
+
+	<div id="eventDetailsButtonGroup" style="padding-left:10px;padding-right:10px;font-size:1em;display:none;">
+		<a href="#" id="eventDetailsPickDateLink" style="color:#7a0019;font-size:.90em;" tabindex="-1">Pick Another Date</a>
+
+		<!-- 	these 2 divs below are populated with Event data from Salesforce in the javascript above
+				the instructions can be displayed above the registration form and the thank you message would
+				be displayed if the registration form successfully submits
+		 -->
+		<div id="registrationInstructions" style="padding-top:10px;font-size:.9em;"><!-- value is written here by javascript --></div>
+		<div id="registrationThankYouMessage" style="color:#000;font-size:.9em;"><!-- value is written here by javascript --></div>
+	</div>
+
+
+	<!-- calendar -->
+	<div id="calendarSection" style="padding-left:10px;padding-right:10px;color:#000;">
+		<div style="padding-bottom:10px;text-align:left;">
+		Click on a calendar entry below to see more details and to register.
+		</div>
+
+		<div id="filter" style="padding-bottom:10px;text-align:left;display:none;">
+		Filter Dates: <select id="EventCategory" onchange="filterEventsOnCalendar();"><option value="View All">View All</option></select>
+		</div>
+
+		<div id="calendar"></div>
+	</div>
+
+	<!-- useful for debugging json being generated from form field + data -->
+	<div id="formOutput" style="padding-top:40px;padding-left:10px;padding-right:10px;color:#000;font-size:1em;"></div><br/>
+</body>
+</html>

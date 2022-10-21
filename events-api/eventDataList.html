@@ -1,0 +1,167 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+	<title>UMN Events API - Event Dates As A List</title>
+	<meta charset="utf-8"/>
+	<style>
+	/* start css resets */
+	html, body, div, span, object, h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+	a, abbr, big, cite, code, img, small, form, label, legend, table,
+	caption, tr, th, td, article, aside, details, figure,
+	figcaption, output, section, summary, time, mark {
+	margin:0;
+	padding:0;
+	border:0;
+	font:inherit;
+	font-size:100%;
+	vertical-align:baseline;
+	}
+	html {line-height:1;}
+	table {border-collapse:collapse;border-spacing:0;}
+	caption, th, td {text-align:left;font-weight:normal;vertical-align:middle;}
+	/* end css resets */
+	body {
+	font-family:Verdana, "Geneva", sans-serif;
+	line-height:1em;
+	max-width:90em;
+	margin:0 auto;
+	background-color:#fff;
+	box-sizing:content-box;
+	color:#000;
+	}
+	a:link, a:visited {
+	font-family:Verdana, "Geneva", sans-serif;
+	color:#000000;
+	}
+	a:hover, a:visited:hover {
+	font-family:Verdana, "Geneva", sans-serif;
+	color:#0000ff;
+	}
+	#eventDatesSection table {width:900px;max-width:90em;}
+	#eventDatesSection th {padding-bottom:4px;padding-top:4px;padding-right:10px;border-bottom:1px solid #000;font-weight:bold;font-size:.9em;}
+	#eventDatesSection td {vertical-align:top;padding-top:4px;padding-right:10px;font-size:.9em;}
+	</style>
+
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+
+	<script type="text/javascript">
+	// the hostPrefix will need to be updated when you're ready to go live against Production data
+	var hostPrefix = "https://don-umn.cs4.force.com";
+
+	$(document).ready(function() {
+		var campusCode = "UMNTC"; // Possible values: UMNTC, UMNCR-Onsite, UMNCR-Online, UMNDL, UMNMO, UMNRO
+
+		// next 2 variables can have multiple values separated by commas
+		var eventTypes = "Visit"; // Possible values: Visit, Non-UMN Event, UMN On Campus Event, UMN Off Campus Event (or any value on the umn_event__Event__c.umn_event__Event_Type__c field)
+		var eventSubType = "Freshman"; // Possible values: Freshman, Transfer, Group (or any value on the umn_event__Event__c.umn_event__Event_Sub_Type__c field)
+
+		// query the events for the calendar
+		$.ajax({
+			url: hostPrefix + "/jsonGetEventCalendarData",
+			dataType: "json",
+			data: {
+				campusCode: campusCode, // required
+				eventTypes: eventTypes, // required
+				eventSubTypes: eventSubType, // optional
+				eventDateId: "", // optional
+				eventId: "" // optional
+			},
+			success: function(result) {
+				$("#formOutput").html("Event Date API Call Results: <pre>" + JSON.stringify(result, null, "  ") + "</pre>").show(); // useful for debugging response from SF method
+				if ( result.hasOwnProperty('error') ) { // look for error message - these types of errors are fatal
+					$("#errorMessage").html(result.error); // reset the error msg
+					$("#errorSection").show();
+				} else { // no fatal error - process data
+					// first look for a "soft" error i.e. none active, full capacity, etc
+					if (result.notFoundErrorMessage != null) {
+						$("#errorMessage").html(result.notFoundErrorMessage); // reset the error msg
+						$("#errorSection").show();
+					} else { // no error and has results
+
+						// build a table for the calendar data
+						var table = $("<table/>");
+						var headRow = $("<tr/>");
+						headRow.append($("<th/>").text("Date"));
+						headRow.append($("<th/>").text("Event Details"));
+						table.append(headRow);
+
+						var currentEventDate;
+						$.each(result.calendarEvents, function(rowIndex, deats) {
+							var dataRow = $("<tr/>");
+							if (currentEventDate != deats.formattedEventDate) { // only output the Date once
+								dataRow.append($("<td/>", {style:"font-weight:bold;"}).text(deats.formattedEventDate));
+							} else {
+								dataRow.append($("<td/>")); // empty
+							}
+							currentEventDate = deats.formattedEventDate;
+							// figure out if the event record have a time, location, both or neither - assign to lineTwo var below so we can output
+							var lineTwo = "";
+							if (deats.formattedEventTime != null && deats.formattedEventTime != "") { // has a time value
+								lineTwo += deats.formattedEventTime;
+
+							}
+
+/*							uncomment this to put the event location below the event time
+							if (deats.eventLocation != null && deats.eventLocation != "") { // has a location value
+								if (lineTwo != "") {
+									lineTwo += "<br/>" // has both time & date info - separate with @
+								}
+
+								// does the location have a url?
+								if (deats.eventLocationMapUrl != null) {
+									lineTwo += "<a href='" + deats.eventLocationMapUrl + "' target='_blank' tabindex:'-1'>" + deats.eventLocation + "</a>";
+								} else { // no url
+									lineTwo += deats.eventLocation;
+								}
+							}
+*/
+							if (lineTwo != "") { // write out a line below the url that has time and/or location info
+								dataRow.append($("<td/>").append($("<div/>").append($("<a/>", {href:"eventDetails.html?eventDateId=" + deats.id})
+									.text(deats.title)).append($("<div/>", {style:"padding-bottom:10px;"}).html(lineTwo)))); // a, div , td
+							} else {
+								dataRow.append($("<td/>").append($("<div/>", {style:"padding-bottom:10px;"}).append($("<a/>", {href:"eventDetails.html?eventDateId=" + deats.id})
+									.text(deats.title))));
+							}
+							table.append(dataRow);
+						});
+						$("#eventDatesSection").html(table);
+						$("#eventDatesSection").show();
+					}
+				}
+			},
+			error: function() {
+				//$("#formOutput").append("<br/>error results = " + JSON.stringify(result)).show(); // useful for debugging response from SF method
+				// this is for network issues, or fatal errors
+				// display error message and do not show the register button
+				$("#errorMessage").html("Error: Network Issues, please try again later.");
+				$("#errorSection").show();
+			}
+		});
+	});
+	</script>
+</head>
+
+<body>
+	<div style="padding-top:40px;padding-left:10px;padding-right:10px;color:#000;font-weight:bold;font-size:1.5em;">UMN Events API - Event Dates As A List</div><br/>
+
+	<div style="padding-top:20px;padding-left:10px;padding-right:10px;color:#000;font-size:1em;">
+		This example calls the <strong>jsonGetEventCalendarData</strong> Event API method. The API call to get Event Calendar Data queries up to
+		150 days in the future for a given Campus Code and returns Event Dates that are visible on the web and have capacity. This implementation
+		example lists all Event Dates with the most recent Event Dates displayed first. The View Details link passed the Event Date Id as a parameter
+		to an Event Details page where the sessions are displayed.
+	</div><br/><br/>
+
+
+	<!-- error section -->
+	<div id="errorSection" style="padding-top:40px;padding-left:10px;padding-right:10px;display:none;">
+		<div id="errorMessage" style="color:#cc0000;font-weight:bold;font-size:1em;"></div><br/>
+	</div>
+
+	<!-- event dates list -->
+	<div id="eventDatesSection" style="padding-left:10px;padding-right:10px;color:#000;"></div>
+
+	<!-- useful for debugging json being generated from form field + data -->
+	<div id="formOutput" style="padding-top:40px;padding-left:10px;padding-right:10px;color:#000;font-size:1em;"></div><br/>
+</body>
+</html>

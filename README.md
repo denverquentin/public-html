@@ -3,8 +3,8 @@ Using this repository to host html pages. Github supports html files and markdow
 
 
 ## Public Url Examples
-- https://denverquentin.github.io/public-html/umn-events-api-doc.html
-- https://denverquentin.github.io/public-html/ust-community-login.html
+- https://denverquentin.github.io/public-html/events-api
+- https://denverquentin.github.io/public-html/community-login.html
 
 
 ## Pages Support

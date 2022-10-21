@@ -1,0 +1,158 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+	<title>UMN Events API - School Lookup</title>
+	<meta charset="utf-8"/>
+	<style>
+	/* start css resets */
+	html, body, div, span, object, h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+	a, abbr, big, cite, code, img, small, form, label, legend, table,
+	caption, tr, th, td, article, aside, details, figure,
+	figcaption, output, section, summary, time, mark {
+	margin:0;
+	padding:0;
+	border:0;
+	font:inherit;
+	font-size:100%;
+	vertical-align:baseline;
+	}
+	html {line-height:1;}
+	table {border-collapse:collapse;border-spacing:0;}
+	caption, th, td {text-align:left;font-weight:normal;vertical-align:middle;}
+	/* end css resets */
+	body {
+	font-family:Verdana, "Geneva", sans-serif;
+	line-height:1em;
+	max-width:90em;
+	margin:0 auto;
+	background-color:#fff;
+	box-sizing:content-box;
+	color:#000;
+	}
+
+	/* start of form style - specific to this example - is not needed for any of the Javascript libraries */
+	.form-style-2 {max-width:620px;padding:10px 12px 10px 0px;font-size:.9em;}
+	.form-style-2 label {display:block;margin:10px 0px 14px 0px;}
+	.form-style-2 label > span {float:left;padding-top:8px;padding-right:5px;}
+	.form-style-2 input.input-field, .form-style-2 .textarea-field, .form-style-2 .select-field {
+	box-sizing:border-box;
+	-webkit-box-sizing:border-box;
+	-moz-box-sizing:border-box;
+	border:1px solid #C2C2C2;
+	box-shadow:1px 1px 4px #EBEBEB;
+	-moz-box-shadow:1px 1px 4px #EBEBEB;
+	-webkit-box-shadow:1px 1px 4px #EBEBEB;
+	border-radius:3px;
+	-webkit-border-radius:3px;
+	-moz-border-radius:3px;
+	padding:7px;
+	outline:none;
+	}
+	.form-style-2 .input-field:focus, .form-style-2 .textarea-field:focus, .form-style-2 .select-field:focus {border:1px solid #000;}
+	/* form tweak - controls width of label*/
+	.form-style-2 label > span {width:180px;}
+	/* end of form style - specific to this example - is not needed for any of the Javascript libraries */
+
+	/* style for the school name autocomplete field */
+	.autocomplete-suggestions { border: 1px solid #999; background: #FFF; overflow: auto; }
+	.autocomplete-suggestion { padding: 2px 5px; white-space: nowrap; overflow: hidden; }
+	.autocomplete-selected { background: #F0F0F0; }
+	.autocomplete-suggestions strong { font-weight: normal; color: #3399FF; }
+	.autocomplete-group { padding: 2px 5px; }
+	.autocomplete-group strong { display: block; border-bottom: 1px solid #000; }
+	</style>
+
+	<!-- THESE 2 JAVASCRIPT LIBARIES ARE NEEDED -->
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+	<!-- jquery.autocomplete.min.js is not hosted on a public CDN so you will need to host it on your web server -->
+	<script src="jquery.autocomplete.min.js"></script>
+
+	<script type="text/javascript">
+	/* 	this Event API calls queries schools (High School & Colleges) based text entered into a School_Name_Text__c field
+		that is hooked up to an autocomplete jquery library. This API can also take a studentType parameter with a value of Freshman, Transfer or Blank.
+
+		this example uses Jquery and the autocomplete Jquery library
+	*/
+
+	// the hostPrefix will need to be updated when you're ready to go live against Production data
+	var hostPrefix = "https://don-umn.cs4.force.com";
+
+	$(document).ready(function() {
+
+		// initialize the school search field when it gets focus. that way the Freshman/Transfer field should be set
+		$("#School_Name_Text__c").focus(function() {
+			// hook up the School_Name_Text__c field to be like this: https://www.devbridge.com/sourcery/components/jquery-autocomplete/
+			$("#School_Name_Text__c").autocomplete({
+				serviceUrl: hostPrefix + "/jsonSchoolLookup",
+				type: "GET",
+				dataType: "json",
+				minChars: 3, // means the API will not be called until at least 3 characters are entered in the School_Name_Text__c field
+				paramName: "schoolName",
+				params: {
+					studentType: $("#Freshman_or_Transfer__c").val()
+				},
+				transformResult: function(response) {
+					$("#formOutput").html("API Call Results: <pre>" + JSON.stringify(response, null, "  ") + "</pre>").show(); // useful for debugging response from SF method
+					return {
+						suggestions: $.map(response, function(obj) {
+							return { value: obj.value, data: obj.data };
+						})
+					};
+				},
+				onSelect: function (suggestion) {
+					$("#School_Name__c").val(suggestion.data); // write the id to a hidden field
+				},
+				onSearchComplete: function (query, suggestions) {
+					if (!suggestions.length) {
+						$("#School_Name__c").val(""); // clear id if new search is started and nothing is found
+					}
+				}
+			});
+		});
+	});
+	</script>
+</head>
+
+<body>
+	<div style="padding-top:40px;padding-left:10px;padding-right:10px;color:#000;font-weight:bold;font-size:1.5em;">UMN Events API - School Lookup</div><br/>
+
+	<div style="padding-top:20px;padding-left:10px;padding-right:10px;color:#000;font-size:1em;">
+		This example calls the <strong>jsonSchoolLookup</strong> Event API method to search for a matching Organization (Account) record
+		with Record Type = Educational Institution. Organization records are further filtered based on the value of a Freshman or Tranfer field.
+		If Freshmen is selected, only Organizations with Type = High School are queried. If Transfer is selected, only Organizations with Type
+		= Community College or Postsecondary Institution. View the source code to see how it works.
+	</div><br/><br/>
+
+	<form id="regForm" style="padding-top:40px;padding-left:10px;padding-right:10px;">
+		<div class="form-style-2">
+
+			<!-- the values for the Freshman_or_Transfer__c select fields are hard coded for this example to simplify the javascript -->
+			<!-- see the Event Attendee Picklist Values example to see how to dynamically set picklist fields -->
+			<label for="Freshman_or_Transfer__c">
+				<span>Freshman or Transfer</span>
+				<select name="Freshman_or_Transfer__c" id="Freshman_or_Transfer__c" class="select-field">
+					<option value=""></option>
+					<option value="Freshman">Freshman</option>
+					<option value="Transfer">Transfer</option>
+				</select>
+			</label>
+
+			<label for="School_Name_Text__c">
+				<span>School Name</span>
+				<input name="School_Name_Text__c" id="School_Name_Text__c" type="text" class="input-field" style="width:65%;"/>
+			</label>
+
+			<label for="School_Name__c">
+				<span>Selected School Id</span>
+				<!-- normally you would want this as a hidden field - this is a visible field for demo purposes -->
+				<input name="School_Name__c" id="School_Name__c" type="text" class="input-field" readonly="readonly"/>
+			</label>
+
+		</div>
+	</form>
+
+	<!-- useful for debugging json being generated from form field + data -->
+	<div id="formOutput" style="padding-top:80px;padding-left:10px;padding-right:10px;color:#000;font-size:1em;"></div><br/>
+</body>
+</html>

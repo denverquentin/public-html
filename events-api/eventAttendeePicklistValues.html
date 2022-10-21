@@ -1,0 +1,186 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+	<title>UMN Events API - Event Attendee Picklist Values</title>
+	<meta charset="utf-8"/>
+	<!-- THIS STYLESHEET IS NEEDED -->
+	<link href="//cdnjs.cloudflare.com/ajax/libs/select2/4.0.0/css/select2.min.css" rel="stylesheet"/>
+
+	<style>
+	/* start css resets */
+	html, body, div, span, object, h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+	a, abbr, big, cite, code, img, small, form, label, legend, table,
+	caption, tr, th, td, article, aside, details, figure,
+	figcaption, output, section, summary, time, mark {
+	margin:0;
+	padding:0;
+	border:0;
+	font:inherit;
+	font-size:100%;
+	vertical-align:baseline;
+	}
+	html {line-height:1;}
+	table {border-collapse:collapse;border-spacing:0;}
+	caption, th, td {text-align:left;font-weight:normal;vertical-align:middle;}
+	/* end css resets */
+	body {
+	font-family:Verdana, "Geneva", sans-serif;
+	line-height:1em;
+	max-width:90em;
+	margin:0 auto;
+	background-color:#fff;
+	box-sizing:content-box;
+	color:#000;
+	}
+
+	/* start of form style - specific to this example - is not needed for any of the Javascript libraries */
+	.form-style-2 {max-width:620px;padding:10px 12px 10px 0px;font-size:.9em;}
+	.form-style-2 label {display:block;margin:10px 0px 14px 0px;}
+	.form-style-2 label > span {float:left;padding-top:8px;padding-right:5px;}
+	.form-style-2 input.input-field, .form-style-2 .textarea-field, .form-style-2 .select-field {
+	box-sizing:border-box;
+	-webkit-box-sizing:border-box;
+	-moz-box-sizing:border-box;
+	border:1px solid #C2C2C2;
+	box-shadow:1px 1px 4px #EBEBEB;
+	-moz-box-shadow:1px 1px 4px #EBEBEB;
+	-webkit-box-shadow:1px 1px 4px #EBEBEB;
+	border-radius:3px;
+	-webkit-border-radius:3px;
+	-moz-border-radius:3px;
+	padding:7px;
+	outline:none;
+	}
+	.form-style-2 .input-field:focus, .form-style-2 .textarea-field:focus, .form-style-2 .select-field:focus {border:1px solid #000;}
+	/* form tweak - controls width of label*/
+	.form-style-2 label > span {width:180px;}
+	/* end of form style - specific to this example - is not needed for any of the Javascript libraries */
+
+	/* select2 css tweaks - keeps placeholder text from being truncated - http://stackoverflow.com/questions/12683907/set-the-width-of-select2-input-through-angular-ui-directive */
+	.select2-container .select2-search__field {width:100% !important;}
+	.select2-container--default .select2-selection--multiple:before {content:' ';display:block;position:absolute;border-color:#888 transparent transparent transparent;border-style:solid;border-width:5px 4px 0 4px;height:0;right:6px;margin-left:-4px;margin-top:-2px;top:50%;width:0;cursor:pointer}
+	</style>
+
+	<!-- THESE 3 JAVASCRIPT LIBARIES ARE NEEDED -->
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+	<script src="//cdnjs.cloudflare.com/ajax/libs/select2/4.0.0/js/select2.min.js"></script>
+	<!-- select2 needs the Placeholder for older browsers - https://github.com/jamesallardice/Placeholders.js -->
+	<!-- placeholders is not hosted on a public CDN so you will need to host it on your web server -->
+	<script src="placeholders.jquery.min.js"></script>
+
+	<script type="text/javascript">
+	/* 	This is one of the simpler Event API calls and is a good one to start with. All it does is take a
+		comma separated string of umn_event__Event_Attendee__c picklist field names and
+		returns a JSON map with a key of the field name and value of a List of String values. Be sure to
+		include the namespace for the field if it exists.
+
+		This example implementation uses Jquery and the select2 Jquery library
+		(which requires the placeholders Jquery library for compatibility with older browsers).
+		Select2 allows us to implement a clean and nice version of multiselect picklists that work on mobile sites.
+	*/
+
+	// the hostPrefix will need to be updated when you're ready to go live against Production data
+	var hostPrefix = "https://don-umn.cs4.force.com";
+
+	$(document).ready(function() {
+
+		// get the picklist values for any picklist field on the Event Attendee (umn_event__Event_Attendee__c) object
+		// the fields listed below are not inclusive and you can contact the Salesforce team to request new fields
+		// IMPORTANT NOTE: the field names are case sensitive and must match the SF API fiel name exactly!
+		// this example gets data for some picklist fields that are not displayed. to make this call as faster, only retrieve values for used fields
+		var sfFields = "umn_event__State__c,umn_event__Country__c,Citizenship__c,Freshman_or_Transfer__c,Major_of_Interest_Rochester__c,";
+			sfFields += "Major_of_Interest_Crookston_Online__c,Major_of_Interest_Crookston_Onsite__c,Major_of_Interest_Duluth__c,";
+			sfFields += "Minor_of_Interest_Crookston_Online__c,Minor_of_Interest_Crookston_Onsite__c,Major_of_Interest_Morris__c,";
+			sfFields += "Term_of_Interest__c,"; // the values for this field are dynamic based on the Campus and Student Type parameters passed into the Ajax call
+			sfFields += "TC_Consolidated_Majors__c"; // this field is not "standard". instead, it consolidates the 9 TC majors fields into 1 and removes dupe majors
+
+		// this is the ajax call to the API - the data attribute is parameters that are passed into the API call
+		$.ajax({
+			url: hostPrefix + "/jsonGetEventAttendeePicklistValue",
+			dataType: "json",
+			data: {
+				picklistFields: sfFields,
+				campusCode: "UMNTC", // Possible values: UMNTC, UMNCR-Onsite, UMNCR-Online, UMNDL, UMNMO, UMNRO - will throw error if blank or invalid
+				studentType: "" // this parameter is only relevant to TC and is only used to determine values for the Term_of_Interest__c field. Possible values are: Freshman, Transfer or Blank
+			},
+			success: function(result) { // this function is called if the Ajax call was successful
+				$("#formOutput").html("API Call Results: <pre>" + JSON.stringify(result, null, "  ") + "</pre>").show(); // useful for debugging response from SF method
+				if ( result.hasOwnProperty('error') ) { // look for error message
+					$("#errorMessage").html(result.error); // reset the error msg
+					$("#errorSection").show();
+				} else { // no error - process data
+					// this is sweet code that puts picklist values (options) on the right fields
+					Object.keys(result).forEach(function (key) {
+						//alert(key + " = " +data[key]);
+						$.each($.makeArray(result[key]), function(index, v) {
+							$("#" + key).append($("<option/>").attr("value", v).text(v));
+						});
+					});
+
+					// make all the multiselect fields awesome - https://select2.github.io/examples.html
+					$("#TC_Consolidated_Majors__c").select2();
+					// show the form now that the picklist fields are populated
+					$("#regForm").show();
+				}
+			},
+			error: function(e) { // this function is called if the Ajax call failed (possibly because the domain wasn't whitelisted in SF)
+				// this is for network issues, or fatal errors
+				// set error message and display error section
+				$("#errorMessage").html("Error: Network Issue");
+				$("#errorSection").show();
+			}
+		});
+	});
+	</script>
+</head>
+
+<body>
+	<div style="padding-top:40px;padding-left:10px;padding-right:10px;color:#000;font-weight:bold;font-size:1.5em;">UMN Events API - Event Attendee Picklist Values</div><br/>
+
+	<div style="padding-top:20px;padding-left:10px;padding-right:10px;color:#000;font-size:1em;">
+		This example calls the <strong>jsonGetEventAttendeePicklistValue</strong> Event API method to get real-time picklist values defined
+		for a field. The Majors of Interest field allows multiple values to be selected in a user friendly way.
+		View the source code to see how everything works.
+	</div><br/><br/>
+
+	<!-- error section - if there's an error communicating with the Event API, jquery will write out error here and make the section visible -->
+	<div id="errorSection" style="padding-top:40px;padding-left:10px;padding-right:10px;display:none;">
+		<div id="errorMessage" style="color:#cc0000;font-weight:bold;font-size:1em;"></div><br/>
+	</div>
+
+	<form id="regForm" style="padding-top:40px;padding-left:10px;padding-right:10px;display:none;">
+		<div class="form-style-2">
+
+			<!-- notice that the select fields below do not have option values defined yet - they're set by the Ajax call to the API above -->
+			<label for="umn_event__State__c">
+				<span>Home State</span>
+				<select name="umn_event__State__c" id="umn_event__State__c" class="select-field"><option value=""></option></select>
+			</label>
+
+			<label for="Citizenship__c">
+				<span>Citizenship</span>
+				<select name="Citizenship__c" id="Citizenship__c" class="select-field"><option value=""></option></select>
+			</label>
+
+			<label for="Term_of_Interest__c">
+				<span>Term of Interest</span>
+				<select name="Term_of_Interest__c" id="Term_of_Interest__c" class="select-field"></select>
+			</label>
+
+			<label for="Freshman_or_Transfer__c">
+				<span>Freshman or Transfer</span>
+				<select name="Freshman_or_Transfer__c" id="Freshman_or_Transfer__c" class="select-field"><option value=""></option></select>
+			</label>
+
+			<label for="TC_Consolidated_Majors__c">
+				<span>Majors of Interest</span>
+				<div><select name="TC_Consolidated_Majors__c[]" id="TC_Consolidated_Majors__c" multiple="multiple" data-placeholder="Multiple Allowed" class="select-field" style="width:65%;"></select></div>
+			</label>
+		</div>
+	</form>
+
+	<!-- useful for debugging json being generated from form field + data -->
+	<div id="formOutput" style="padding-top:40px;padding-left:10px;padding-right:10px;color:#000;font-size:1em;"></div><br/>
+</body>
+</html>
