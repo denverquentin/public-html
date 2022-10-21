@@ -1,0 +1,161 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+	<title>UMN Events API - Documentation and Examples</title>
+	<meta charset="utf-8"/>
+	<style>
+	/* start css resets */
+	html, body, div, span, object, h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+	a, abbr, big, cite, code, del, dfn, em, img, ins, kbd, q, s, samp,
+	small, strong, sub, sup, center, dl, dt, dd, fieldset, form, label, legend, table,
+	caption, tr, th, td, article, aside, details, figure,
+	figcaption, output, section, summary, time, mark {
+	margin:0;
+	padding:0;
+	border:0;
+	font:inherit;
+	font-size:100%;
+	vertical-align:baseline;
+	}
+	html {line-height:1;}
+	table {border-collapse:collapse;border-spacing:0;}
+	caption, th, td {text-align:left;font-weight:normal;vertical-align:middle;}
+	/* end css resets */
+	body {
+	font-family:Verdana, "Geneva", sans-serif;
+	line-height:1em;
+	max-width:90em;
+	margin:0 auto;
+	background-color:#fff;
+	box-sizing:content-box;
+	color:#000;
+	}
+	a:link, a:visited {
+	font-family:Verdana, "Geneva", sans-serif;
+	color:#000000;
+	}
+	a:hover, a:visited:hover {
+	font-family:Verdana, "Geneva", sans-serif;
+	color:#0000ff;
+	}
+	</style>
+</head>
+
+<body>
+	<div style="padding-top:40px;padding-left:20px;color:#000;font-weight:bold;font-size:1.5em;">UMN Events API - Documentation and Examples</div><br/>
+
+	<div style="padding-top:40px;padding-left:20px;color:#000;font-size:1em;">
+		<table cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+		<tr>
+			<td style="vertical-align:top;padding-bottom:40px;padding-right:10px;font-weight:bold;">Purpose:</td>
+			<td style="vertical-align:top;padding-bottom:40px;padding-right:10px;">
+				The UMN Salesforce team designed and built the Events API to allow campuses to implement their own Event and Visit pages
+				developed to meet their data and design requirements.
+				<br/><br/>
+				The design of the Events API allows new fields added to the Event Attendee object in Salesforce to become immediately
+				available via the Events API with no code changes. The design also allows new versions of an API call to be easily added
+				while providing backwards compatability for existing implementations to ensure they do not break.
+			</td>
+		</tr>
+
+
+		<tr>
+			<td style="vertical-align:top;padding-bottom:40px;padding-right:10px;font-weight:bold;">Technology:</td>
+			<td style="vertical-align:top;padding-bottom:40px;padding-right:10px;">
+				The Events API was designed to be called
+				<a href="https://en.wikipedia.org/wiki/Ajax_(programming)" target="_blank">asynchronously from Javascript (AJAX)</a>
+				and returns data in <a href="https://en.wikipedia.org/wiki/JSON" target="_blank">JSON</a> format. These client-side
+				technologies were chosen because of their speed, reliability, ease of use and community support. The Events API can
+				be consumed with just Javascript, jQuery and HTML. The current implementation hosted on Salesforce and the examples
+				below also uses these free open source Jquery libraries to simplify development:<br/>
+				<a href="http://fullcalendar.io/" target="_blank">FullCalendar</a><br/>
+				<a href="http://jqueryui.com/" target="_blank">jQuery UI</a><br/>
+				<a href="http://momentjs.com/" target="_blank">Moment.js</a> (needed by FullCalendar)<br/>
+				<a href="https://www.devbridge.com/sourcery/components/jquery-autocomplete/" target="_blank">jQuery-Autocomplete</a><br/>
+				<a href="https://select2.github.io/" target="_blank">Select2</a><br/>
+				<a href="https://github.com/jamesallardice/Placeholders.js" target="_blank">Placeholders.js</a> (needed by Select2 for old browsers)<br/>
+				<a href="https://github.com/marioizquierdo/jquery.serializeJSON" target="_blank">jQuery.serializeJSON</a><br/>
+				<a href="http://jqueryvalidation.org/" target="_blank">jQuery.validate</a><br/>
+			</td>
+		</tr>
+
+
+		<tr>
+			<td style="vertical-align:top;padding-bottom:40px;padding-right:10px;font-weight:bold;">Active Implementations:</td>
+			<td style="vertical-align:top;padding-bottom:40px;padding-right:10px;">
+				Below are active implementations of the Even API methods that are hosted at Salesforce. These are a good reference
+				to see how all the Event API methods work together. This implementation was done with no server side code so you
+				can view the source to see how it works. The test urls below are subject to change so if they don't work, contact
+				the UMN Salesforce team for the updated url.<br/><br/>
+
+				<a href="http://don-umn.cs4.force.com/Rochester_Visit" target="_blank">Rochester Visits (Test)</a><br/>
+				<a href="https://umn.secure.force.com/Rochester_Visit" target="_blank">Rochester Visits (Production)</a><br/><br/>
+
+				<a href="http://don-umn.cs4.force.com/TwinCities_Visit_Freshman" target="_blank">Twin Cities Freshman Visits (Test)</a><br/>
+				<a href="https://umn.secure.force.com/TwinCities_Visit_Freshman" target="_blank">Twin Cities Freshman Visits (Production)</a><br/><br/>
+
+				<a href="http://don-umn.cs4.force.com/TwinCities_Visit_Group" target="_blank">Twin Cities Group Visits (Test)</a><br/>
+				<a href="https://umn.secure.force.com/TwinCities_Visit_Group" target="_blank">Twin Cities Group Visits (Production)</a><br/>
+			</td>
+		</tr>
+
+
+		<tr>
+			<td style="vertical-align:top;padding-bottom:40px;padding-right:10px;font-weight:bold;">Cross-Origin Resource Sharing (CORS):</td>
+			<td style="vertical-align:top;padding-bottom:40px;padding-right:10px;">
+				We uses <a href="https://en.wikipedia.org/wiki/Cross-origin_resource_sharing" target="_blank">CORS</a> to
+				control access to the Events API. CORS is not supported in some older browsers such as IE9 and below. Also, our
+				implementation of CORS only supports https so any web page that needs access to the Events API must use https.
+				<br/><br/>
+
+				To whitelist your web server for CORS, follow these steps:<br/>
+				1. Ensure your web server supports SSL. We can only whitelist https domains for CORS.<br/>
+
+				2. Contact the UMN Salesforce team and let them know the https domain name that will call into the Events API.<br/>
+
+				3. After that, all of the examples listed below that point to our development/test environment should work. If you don't
+				see test data, you can contact the Salesforce team and have them create test data for you.<br/>
+
+				4. Once your website is built and is ready to go live, contact the UMN Salesforce team again to have them whitelist your
+				https domain in the production Salesforce environment.
+			</td>
+		</tr>
+
+
+		<tr>
+			<td style="vertical-align:top;padding-bottom:40px;padding-right:10px;font-weight:bold;">API Endpoint:</td>
+			<td style="vertical-align:top;padding-bottom:40px;padding-right:10px;">
+				All of the API Endpoints in the examples below currently point to our test environment at: http://don-umn.cs4.force.com
+				but this API Endpoint can change. Ask the UMN Salesforce team if this endpoint is still valid before you start development.
+				<br/><br/>
+				When you are done developing and testing, contact the UMN Salesforce team for the production API Endpoint. The production
+				endpoint will never change.
+			</td>
+		</tr>
+
+
+		<tr>
+			<td style="vertical-align:top;padding-bottom:40px;padding-right:10px;font-weight:bold;">Documented Examples:</td>
+			<td style="vertical-align:top;padding-bottom:40px;padding-right:10px;">
+				These pages demonstrate a working example of each API call and include documented source code. Data returned
+				in JSON format from the Events API is also output at the bottom of these example pages so you can see
+				what attributes are available for use.<br/><br/>
+
+				<a href="eventAttendeePicklistValues.html">Event Attendee Picklist Values</a><br/>
+				<a href="schoolLookup.html">School Lookup</a><br/>
+				<a href="eventDataCalendar.html">Event Dates &amp; Sessions On Calendar</a><br/>
+				<a href="eventDataList.html">Event Dates List with Link to Event Details &amp; Sessions &amp; Event Attendee Registration Form</a><br/>
+			</td>
+		</tr>
+
+
+		<tr>
+			<td style="vertical-align:top;padding-bottom:40px;padding-right:10px;font-weight:bold;">Last Document Update:</td>
+			<td style="vertical-align:top;padding-bottom:40px;padding-right:10px;">April 1, 2016</td>
+		</tr>
+		</table>
+	</div>
+	<br/>
+</body>
+</html>
